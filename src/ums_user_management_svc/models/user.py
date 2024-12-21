@@ -1,5 +1,6 @@
-from sqlalchemy import Column, String
+from sqlalchemy import Column, String, Integer, DateTime
 from .base import Base
+from datetime import datetime
 
 class User(Base):
     __tablename__ = 'users'
@@ -10,3 +11,5 @@ class User(Base):
     state_province = Column(String, nullable=False)
     hashed_password = Column(String, nullable=False)
     account_status = Column(String, nullable=False, server_default='pending')
+    failed_login_attempts = Column(Integer, nullable=False, default=0)
+    account_locked_until = Column(DateTime, nullable=True)
