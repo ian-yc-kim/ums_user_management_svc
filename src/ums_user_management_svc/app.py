@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from src.ums_user_management_svc.routers.signup import router as signup_router
+from src.ums_user_management_svc.routers.verification import router as verification_router
 
-app = FastAPI(debug=True)
+app = FastAPI()
 
-# Include routers
-app.include_router(signup_router)
+app.include_router(signup_router, prefix='/signup')
+app.include_router(verification_router, prefix='/verify')

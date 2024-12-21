@@ -7,7 +7,12 @@ from email_validator import validate_email, EmailNotValidError
 from bcrypt import gensalt, hashpw
 from src.ums_user_management_svc.models.user import User
 from src.ums_user_management_svc.models.base import get_session
-from src.ums_user_management_svc.service.email_service import send_verification_email  # Assuming this service exists
+from src.ums_user_management_svc.service.email_service import send_verification_email
+from itsdangerous import URLSafeTimedSerializer
+from src.ums_user_management_svc.config import SECRET_KEY, DOMAIN_URL
+import logging
+
+serializer = URLSafeTimedSerializer(SECRET_KEY)
 
 class SignupRequest(BaseModel):
     email: EmailStr
@@ -21,22 +26,32 @@ class SignupResponse(BaseModel):
 
 router = APIRouter()
 
-@router.post('/signup', response_model=SignupResponse)
+@router.post('/', response_model=SignupResponse)
 def signup(user: SignupRequest, db: Session = Depends(get_session)):
     # Validate email format without checking deliverability
     try:
         validate_email(user.email, check_deliverability=False)
     except EmailNotValidError as e:
+        logging.error(e, exc_info=True)
         raise HTTPException(status_code=400, detail='Invalid email format') from e
 
     # Debug: Print available tables in the current session
-    inspector = inspect(db.get_bind())
-    tables = inspector.get_table_names()
-    print("Available tables in the current session:", tables)
+    try:
+        inspector = inspect(db.get_bind())
+        tables = inspector.get_table_names()
+        logging.debug(f"Available tables in the current session: {tables}")
+    except Exception as e:
+        logging.error(e, exc_info=True)
+        raise HTTPException(status_code=500, detail='Internal server error')
 
     # Check if email is already registered
     stmt = select(User).where(User.email == user.email)
-    existing_user = db.execute(stmt).scalar_one_or_none()
+    try:
+        existing_user = db.execute(stmt).scalar_one_or_none()
+    except Exception as e:
+        logging.error(e, exc_info=True)
+        raise HTTPException(status_code=500, detail='Database query failed')
+
     if existing_user:
         raise HTTPException(status_code=409, detail='Email already registered')
 
@@ -47,7 +62,11 @@ def signup(user: SignupRequest, db: Session = Depends(get_session)):
         raise HTTPException(status_code=400, detail='Password does not meet complexity requirements')
 
     # Hash the password
-    hashed_password = hashpw(user.password.encode('utf-8'), gensalt()).decode('utf-8')
+    try:
+        hashed_password = hashpw(user.password.encode('utf-8'), gensalt()).decode('utf-8')
+    except Exception as e:
+        logging.error(e, exc_info=True)
+        raise HTTPException(status_code=500, detail='Password hashing failed')
 
     # Create new user
     new_user = User(
@@ -59,9 +78,17 @@ def signup(user: SignupRequest, db: Session = Depends(get_session)):
         account_status='pending'
     )
     db.add(new_user)
-    db.commit()
+    try:
+        db.commit()
+    except Exception as e:
+        logging.error(e, exc_info=True)
+        raise HTTPException(status_code=500, detail='Database commit failed')
 
     # Send verification email
-    send_verification_email(user.email)
+    try:
+        send_verification_email(user.email)
+    except Exception as e:
+        logging.error(e, exc_info=True)
+        raise HTTPException(status_code=500, detail='Failed to send verification email')
 
     return SignupResponse(message='User created successfully. Please verify your email.')
