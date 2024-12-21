@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, EmailStr
+from src.ums_user_management_svc.schemas.login import LoginRequest, LoginResponse
 from src.ums_user_management_svc.models.user import User
 from src.ums_user_management_svc.models.session import Session as UserSession
 from src.ums_user_management_svc.utils.jwt import generate_token
@@ -10,14 +10,6 @@ import logging
 from datetime import datetime, timedelta
 
 router = APIRouter()
-
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
-
-class LoginResponse(BaseModel):
-    access_token: str
-    token_type: str
 
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_DURATION = timedelta(minutes=15)

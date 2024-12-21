@@ -78,3 +78,53 @@ def test_invalid_credentials(client, mock_db_session):
     
     # Cleanup
     app.dependency_overrides.clear()
+
+
+def test_missing_fields(client, mock_db_session):
+    # Mock the get_db dependency
+    app.dependency_overrides[get_db] = lambda: mock_db_session
+    
+    # Missing password
+    response = client.post(
+        "/login",
+        json={"email": "test_user@example.com"}
+    )
+    assert response.status_code == 422
+    
+    # Missing email
+    response = client.post(
+        "/login",
+        json={"password": "password123"}
+    )
+    assert response.status_code == 422
+    
+    # Cleanup
+    app.dependency_overrides.clear()
+
+
+def test_invalid_email_format(client, mock_db_session):
+    # Mock the get_db dependency
+    app.dependency_overrides[get_db] = lambda: mock_db_session
+    
+    response = client.post(
+        "/login",
+        json={"email": "invalid_email", "password": "password123"}
+    )
+    assert response.status_code == 422
+    
+    # Cleanup
+    app.dependency_overrides.clear()
+
+
+def test_weak_password(client, mock_db_session):
+    # Assuming password-validator is used for strength
+    app.dependency_overrides[get_db] = lambda: mock_db_session
+    
+    response = client.post(
+        "/login",
+        json={"email": "test_user@example.com", "password": "123"}
+    )
+    assert response.status_code == 422
+    
+    # Cleanup
+    app.dependency_overrides.clear()
