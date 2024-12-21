@@ -128,3 +128,83 @@ def test_weak_password(client, mock_db_session):
     
     # Cleanup
     app.dependency_overrides.clear()
+
+
+def test_account_lockout_after_max_failed_attempts(client, mock_db_session):
+    # Setup user with failed_login_attempts = MAX_FAILED_ATTEMPTS-1
+    user = User(
+        email="test_lockout@example.com",
+        hashed_password=get_hashed_password("password123"),
+        account_status="active",
+        failed_login_attempts=4,  # Assuming MAX_FAILED_ATTEMPTS=5
+        account_locked_until=None
+    )
+    mock_db_session.query.return_value.filter.return_value.first.return_value = user
+
+    app.dependency_overrides[get_db] = lambda: mock_db_session
+
+    # Attempt one more failed login
+    response = client.post(
+        "/login",
+        json={"email": "test_lockout@example.com", "password": "wrong_password"}
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Account is locked due to too many failed login attempts."
+    assert user.failed_login_attempts == 5
+    assert user.account_locked_until is not None
+
+    app.dependency_overrides.clear()
+
+
+def test_locked_account_cannot_login(client, mock_db_session):
+    # Setup user with account_locked_until in the future
+    future_time = datetime.utcnow() + timedelta(minutes=15)
+    user = User(
+        email="locked_user@example.com",
+        hashed_password=get_hashed_password("password123"),
+        account_status="active",
+        failed_login_attempts=5,
+        account_locked_until=future_time
+    )
+    mock_db_session.query.return_value.filter.return_value.first.return_value = user
+
+    app.dependency_overrides[get_db] = lambda: mock_db_session
+
+    # Attempt to login
+    response = client.post(
+        "/login",
+        json={"email": "locked_user@example.com", "password": "password123"}
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Account is locked. Please try again later."
+
+    app.dependency_overrides.clear()
+
+
+def test_successful_login_resets_failed_attempts(client, mock_db_session):
+    # Setup user with failed_login_attempts >=1
+    user = User(
+        email="reset_attempts@example.com",
+        hashed_password=get_hashed_password("password123"),
+        account_status="active",
+        failed_login_attempts=3,
+        account_locked_until=None
+    )
+    mock_db_session.query.return_value.filter.return_value.first.return_value = user
+
+    app.dependency_overrides[get_db] = lambda: mock_db_session
+
+    # Successful login
+    response = client.post(
+        "/login",
+        json={"email": "reset_attempts@example.com", "password": "password123"}
+    )
+
+    assert response.status_code == 200
+    assert "access_token" in response.json()
+    assert user.failed_login_attempts == 0
+    assert user.account_locked_until is None
+
+    app.dependency_overrides.clear()
