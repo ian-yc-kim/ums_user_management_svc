@@ -1,6 +1,7 @@
-from sqlalchemy import Column, String, ForeignKey, DateTime, Index, Integer
+from sqlalchemy import Column, String, ForeignKey, DateTime, Index, Integer, Boolean
 from sqlalchemy.orm import relationship
 from .base import Base
+import sqlalchemy as sa
 
 class Session(Base):
     __tablename__ = 'sessions'
@@ -10,6 +11,7 @@ class Session(Base):
     token = Column(String, nullable=False, unique=True)
     created_at = Column(DateTime, nullable=False)
     expires_at = Column(DateTime, nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True, server_default=sa.true())
     
     user = relationship("User")
 
