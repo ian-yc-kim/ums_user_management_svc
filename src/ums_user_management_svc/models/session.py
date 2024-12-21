@@ -1,4 +1,5 @@
 from sqlalchemy import Column, String, ForeignKey, DateTime, Index, Integer
+from sqlalchemy.orm import relationship
 from .base import Base
 
 class Session(Base):
@@ -9,6 +10,8 @@ class Session(Base):
     token = Column(String, nullable=False, unique=True)
     created_at = Column(DateTime, nullable=False)
     expires_at = Column(DateTime, nullable=False)
+    
+    user = relationship("User")
 
     __table_args__ = (
         Index('idx_sessions_user_id', 'user_id'),
